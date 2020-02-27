@@ -2,7 +2,8 @@ library(ggplot2)
 library(glmnet)
 library(pcLasso)
 library(PRROC)
-
+library(naivebayes)
+library(e1071)
 
 ####################################################
 # Partition a held-out set
@@ -24,6 +25,40 @@ train   <- rbind(ones[!(1:nrow(ones) %in% ones.sample), ],
                  zeros[!(1:nrow(zeros) %in% zeros.sample), ]
             )
 train   <- train[sample(1:nrow(train)), ]  # shuffle the rows
+
+####################################################
+# Helper functions for processing data
+####################################################
+#transform employment to a quantitative variable
+process_employment <- function(employment_str) {
+  if (is.na(employment_str)) {
+    employment_val <- NA
+  }
+  else if (employment_str == '10+') {
+    employment_val <- 10
+  }
+  else if (employment_str == '< 1') {
+    employment_val <- 0
+  }
+  else {
+    employment_val <- as.numeric(employment_str)
+  }
+}
+
+#transform quality to a quantitative variable
+transform_quality_score <- function(quality_score_str) {
+  return(as.numeric(substr(quality_score_str, 2, 2)))
+}
+
+train$employment <- sapply(train$employment, transform_employment)
+#impute employment NAs with mean
+train$employment[is.na(train$employment)] <- mean(train$employment, na.rm = TRUE)
+train$quality <- sapply(train$quality, transform_quality_score)
+
+heldout$employment <- sapply(heldout$employment, transform_employment)
+#impute employment NAs with mean
+heldout$employment[is.na(heldout$employment)] <- mean(heldout$employment, na.rm = TRUE)
+heldout$quality <- sapply(heldout$quality, transform_quality_score)
 
 # Convert to matrices and deal with dummy variables:
 X   <- makeX(train[, 2:ncol(train)], heldout[, 2:ncol(heldout)]) 
@@ -66,3 +101,23 @@ ggplot(forplot[forplot$x > 0, ], aes(x=x, y=y, color=color)) +
   geom_point(size=1, alpha=.8) +
   geom_line(alpha=.5) +
   labs(x = "L2 norm of beta", y = "AUCPR", title = "Loan data", subtitle = "(held-out data)") 
+
+
+####################################################
+# Naive Bayes and SVM
+####################################################
+#Naive Bayes
+model_nb <- naiveBayes(X, y)
+pred_nb_test <- predict(model_nb, xte)
+
+#Just look the accuracy for now
+accuracy_nb = mean(yte == pred_nb_test)
+print(accuracy_nb)
+
+#SVM with linear kernel
+for (i in c(1e-4, 1e-3, 1e-2, 1e-1, 1, 5)) {
+  model_svm = svm(X, y, scale = TRUE, kernel = 'linear', class.weights = c('0'=1, '1'=1), cost = i)
+  pred_svm_dev = predict(model_svm, xte)
+  print(mean(yte == pred_svm_dev))
+}
+

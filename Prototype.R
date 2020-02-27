@@ -106,6 +106,8 @@ ggplot(forplot[forplot$x > 0, ], aes(x=x, y=y, color=color)) +
 ####################################################
 # Naive Bayes and SVM
 ####################################################
+yte <- factor(heldout[, 1]); y <- factor(train[, 1])
+
 #Naive Bayes
 model_nb <- naiveBayes(X, y)
 pred_nb_test <- predict(model_nb, xte)
@@ -119,5 +121,27 @@ for (i in c(1e-4, 1e-3, 1e-2, 1e-1, 1, 5)) {
   model_svm = svm(X, y, scale = TRUE, kernel = 'linear', class.weights = c('0'=1, '1'=1), cost = i)
   pred_svm_dev = predict(model_svm, xte)
   print(mean(yte == pred_svm_dev))
+}
+
+#Increase the weights for low-prevalent class, seems helpful in improving accuracy, ~0.927
+for (i in c(1e-4, 1e-3, 1e-2, 1e-1, 1, 5)) {
+  model_svm = svm(X, y, scale = TRUE, kernel = 'linear', class.weights = c('0'=1, '1'=2), cost = i)
+  pred_svm_dev = predict(model_svm, xte)
+  print(mean(yte == pred_svm_dev))
+}
+
+#Try some oter kernels, not very helpful
+for(i in c(1, 5, 10, 20, 50)) {
+  model_svm = svm(X, y,
+                  scale = TRUE, kernel = 'radial', class.weights = c('0' = 1, '1' = 2), cost = i)
+  pred_svm_dev = predict(model_svm, xte)
+  print(paste("Radial kernal,", "cost =", i, ":", mean(yte == pred_svm_dev)))
+}
+
+for(i in c(1, 5, 10, 15, 20, 25, 50)) {
+  model_svm = svm(X, y,
+                  scale = TRUE, kernel = 'polynomial', class.weights = c('0' = 1, '1' = 2), cost = i)
+  pred_svm_dev = predict(model_svm, xte)
+  print(paste("Polunomial kernal,", "cost =", i, ":", mean(yte == pred_svm_dev)))
 }
 

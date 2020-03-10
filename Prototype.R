@@ -76,11 +76,21 @@ xte[is.na(xte)] <- 0
 # Splines
 ###################################################
 
-df <- 4
-N <-  ns(X[, "inc"], df = df, intercept = TRUE)
-colnames(N) <- paste0("N.inc", 1:df)
-
-model <- glm(as.formula(paste("y ~", "(",
-                             paste0(rep("N.inc", df), 1:df, collapse = " + "),
+cv.spline <- function(df){
+	Ntrain <- ns(train$inc,   df = df, intercept = TRUE)
+	Ntest  <- ns(heldout$inc, df = df, intercept = TRUE)
+	colnames(Ntrain) <- paste0("Ninc", 1:df)
+	colnames(Ntest)  <- paste0("Ninc", 1:df)
+	model <- glm(as.formula(paste("default ~ . + ", "(",
+                             paste0(rep("Ninc", df), 1:df, collapse = " + "),
                              ")")),
-             data = data.frame(X, N, y))
+	  	   family = "binomial",
+            	 data = data.frame(train, Ntrain))
+
+	heldout <- data.frame(heldout, Ntest)
+	pred  <- predict(model, heldout, type="response") > .5
+	accu  <- mean(pred == heldout$default)
+	accu
+}
+cvs <- sapply(2:22, cv.spline)
+bestspline.df <- 1 + which.max(cvs)

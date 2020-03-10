@@ -50,12 +50,12 @@ transform_quality_score <- function(quality_score_str) {
   return(as.numeric(substr(quality_score_str, 2, 2)))
 }
 
-train$employment <- sapply(train$employment, transform_employment)
+train$employment <- sapply(train$employment, process_employment)
 #impute employment NAs with mean
 train$employment[is.na(train$employment)] <- mean(train$employment, na.rm = TRUE)
 train$quality <- sapply(train$quality, transform_quality_score)
 
-heldout$employment <- sapply(heldout$employment, transform_employment)
+heldout$employment <- sapply(heldout$employment, process_employment)
 #impute employment NAs with mean
 heldout$employment[is.na(heldout$employment)] <- mean(heldout$employment, na.rm = TRUE)
 heldout$quality <- sapply(heldout$quality, transform_quality_score)
@@ -144,4 +144,10 @@ for(i in c(1, 5, 10, 15, 20, 25, 50)) {
   pred_svm_dev = predict(model_svm, xte)
   print(paste("Polunomial kernal,", "cost =", i, ":", mean(yte == pred_svm_dev)))
 }
+
+lasso    <- cv.glmnet(X, y, alpha = 1, family = "binomial")
+pred <- predict(lasso, xte)
+pred_class <- as.numeric(pred > 0.5)
+mean(yte == pred_class)
+
 

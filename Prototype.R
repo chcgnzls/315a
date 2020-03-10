@@ -81,16 +81,34 @@ cv.spline <- function(df){
 	Ntest  <- ns(heldout$inc, df = df, intercept = TRUE)
 	colnames(Ntrain) <- paste0("Ninc", 1:df)
 	colnames(Ntest)  <- paste0("Ninc", 1:df)
-	model <- glm(as.formula(paste("default ~ . + ", "(",
-                             paste0(rep("Ninc", df), 1:df, collapse = " + "),
-                             ")")),
-	  	   family = "binomial",
-            	 data = data.frame(train, Ntrain))
-
-	heldout <- data.frame(heldout, Ntest)
-	pred  <- predict(model, heldout, type="response") > .5
-	accu  <- mean(pred == heldout$default)
-	accu
+	model <- cv.glmnet(cbind(X, Ntrain), y,
+			family = "binomial",
+			alpha  = .5,
+			nfolds = 10)
+	pred <- predict(model, cbind(xte, Ntest), type="response") > .5
+	accu <- mean(pred == heldout$default)
+	return(list(accuracy=accu, model=model))
 }
-cvs <- sapply(2:22, cv.spline)
-bestspline.df <- 1 + which.max(cvs)
+cvs <- lapply(2:22, cv.spline)
+
+#  Select best model
+bestModelIndex <- which.max(sapply(cvs, function(x) x$accuracy))
+bestDF         <- bestModelIndex + 1
+finalModel     <- cvs[[bestModelIndex]]$model
+
+#  Prep test data for prediction
+testData <- read.csv("data/loan_testx.csv")
+testData$employment <- sapply(testData$employment, process_employment)
+testData$employment[is.na(testData$employment)] <- mean(testData$employment, 
+							na.rm = TRUE)
+testData$quality <- sapply(testData$quality, transform_quality_score)
+newX <- makeX(testData)
+newX[is.na(newX)] <- 0
+newX <- newX[, colnames(newX) %in% colnames(X)]
+newN <- ns(newX[, "inc"], df = bestDF, intercept = TRUE)
+
+#  Predictions
+testPreds <- predict(finalModel, cbind(newX, newN), type = "response")
+write.table(testPreds, file = "predictions.txt", 
+	    row.names=FALSE, 
+	    col.names=FALSE)
